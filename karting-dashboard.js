@@ -354,3 +354,202 @@ setTimeout(()=>{
   document.getElementById('explorer-driver-2').addEventListener('change', renderExplorer);
   renderExplorer();
 },0);
+
+// ── Race Battle: Alex vs Stefan ──────────────────────────────────────────────
+(function(){
+  const stefan = [81.43,66.64,65.41,66.82,65.94,67.10,65.94,65.35,65.09,65.16,65.21,68.63,65.72,69.25,65.49,66.49,64.31];
+  const alex   = [82.05,65.45,65.42,68.38,66.67,66.31,65.60,65.49,66.06,65.20,65.73,67.31,65.37,69.14,65.89,65.96,65.33];
+  const gridOffset = 1141.36 - 1139.98; // 1.38s — Alex started 1.38s ahead on the grid
+
+  // gap[i] = (stefanCumulative + gridOffset) - alexCumulative
+  // positive = Alex ahead on track, negative = Stefan ahead
+  let cs = 0, ca = 0;
+  const gaps = stefan.map((s, i) => {
+    cs += s; ca += alex[i];
+    return parseFloat(((cs + gridOffset) - ca).toFixed(3));
+  });
+
+  const annotations = [
+    { lap: 5,  text: 'Stefan takes lead' },
+    { lap: 6,  text: 'Alex fights back' },
+    { lap: 9,  text: 'Stefan surges' },
+    { lap: 12, text: 'Alex recovers' },
+    { lap: 14, text: '🟨 Yellow flag' },
+    { lap: 17, text: 'Dead heat finish' },
+  ];
+
+  function battleChart(gaps, width=900, height=320){
+    const m={t:30,r:24,b:36,l:52}, iw=width-m.l-m.r, ih=height-m.t-m.b;
+    const laps = gaps.length;
+    const rawMin = Math.min(...gaps), rawMax = Math.max(...gaps);
+    const pad = 0.4;
+    const y0 = rawMin - pad, y1 = rawMax + pad;
+    const X = i => m.l + i * iw / (laps - 1);
+    const Y = v => m.t + (y1 - v) * ih / (y1 - y0);
+    const zeroY = Y(0);
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}">`;
+
+    // grid lines
+    const ticks = [-2,-1.5,-1,-0.5,0,0.5,1,1.5,2].filter(v => v >= y0 - 0.1 && v <= y1 + 0.1);
+    ticks.forEach(v => {
+      const y = Y(v);
+      svg += `<line x1="${m.l}" y1="${y}" x2="${width-m.r}" y2="${y}" stroke="${v===0?'#64748b':'#1e293b'}" stroke-width="${v===0?1.5:1}"/>`;
+      svg += `<text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#94a3b8" font-size="10">${v>0?'+':''}${v.toFixed(1)}</text>`;
+    });
+
+    // x-axis labels
+    gaps.forEach((_, i) => {
+      svg += `<text x="${X(i)}" y="${height-8}" text-anchor="middle" fill="#94a3b8" font-size="10">L${i+1}</text>`;
+    });
+
+    // zero-line label
+    svg += `<text x="${m.l-8}" y="${zeroY+4}" text-anchor="end" fill="#94a3b8" font-size="10" font-weight="bold">0</text>`;
+
+    // filled area — above zero = Alex ahead (blue), below zero = Stefan ahead (pink)
+    for (let i = 0; i < gaps.length - 1; i++) {
+      const g0 = gaps[i], g1 = gaps[i+1];
+      const x0 = X(i), x1 = X(i+1);
+      const y0v = Y(g0), y1v = Y(g1);
+
+      // if they cross zero, split at crossing
+      if ((g0 >= 0) !== (g1 >= 0)) {
+        const t = Math.abs(g0) / (Math.abs(g0) + Math.abs(g1));
+        const xm = x0 + t * (x1 - x0);
+        // first half
+        const col0 = g0 >= 0 ? 'rgba(96,165,250,0.35)' : 'rgba(244,114,182,0.35)';
+        svg += `<polygon points="${x0},${y0v} ${xm},${zeroY} ${xm},${zeroY} ${x0},${zeroY}" fill="${col0}"/>`;
+        // second half
+        const col1 = g1 >= 0 ? 'rgba(96,165,250,0.35)' : 'rgba(244,114,182,0.35)';
+        svg += `<polygon points="${xm},${zeroY} ${x1},${y1v} ${x1},${zeroY} ${xm},${zeroY}" fill="${col1}"/>`;
+      } else {
+        const col = g0 >= 0 ? 'rgba(96,165,250,0.35)' : 'rgba(244,114,182,0.35)';
+        svg += `<polygon points="${x0},${y0v} ${x1},${y1v} ${x1},${zeroY} ${x0},${zeroY}" fill="${col}"/>`;
+      }
+    }
+
+    // main gap line
+    let d = '';
+    gaps.forEach((g, i) => { d += (i === 0 ? 'M' : 'L') + X(i) + ',' + Y(g) + ' '; });
+    svg += `<path d="${d}" fill="none" stroke="#e2e8f0" stroke-width="2.5"/>`;
+
+    // dots
+    gaps.forEach((g, i) => {
+      const col = g > 0.05 ? '#60a5fa' : g < -0.05 ? '#f472b6' : '#e2e8f0';
+      svg += `<circle cx="${X(i)}" cy="${Y(g)}" r="4" fill="${col}"/>`;
+    });
+
+    // annotations
+    annotations.forEach(a => {
+      const i = a.lap - 1;
+      const g = gaps[i];
+      const cx = X(i);
+      const cy = Y(g);
+      const above = g >= 0;
+      const tyBase = above ? cy - 14 : cy + 22;
+      svg += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${above ? cy - 8 : cy + 8}" stroke="#64748b" stroke-width="1" stroke-dasharray="3,2"/>`;
+      svg += `<text x="${cx}" y="${tyBase}" text-anchor="middle" fill="#cbd5e1" font-size="9">${a.text}</text>`;
+    });
+
+    // zone labels
+    svg += `<text x="${m.l+8}" y="${m.t+14}" fill="#60a5fa" font-size="11" font-weight="bold">Alex ahead</text>`;
+    svg += `<text x="${m.l+8}" y="${height-m.b-8}" fill="#f472b6" font-size="11" font-weight="bold">Stefan ahead</text>`;
+
+    return svg + `</svg>`;
+  }
+
+  app.insertAdjacentHTML('beforeend', `
+    <div class="card wide">
+      <h2>Race Battle: Alex vs Stefan 🏁</h2>
+      <p class="muted small">On-track gap across all 17 laps, corrected for grid offset (Alex started 1.38 s ahead as P1). Positive = Alex ahead. Negative = Stefan ahead.</p>
+      ${battleChart(gaps)}
+      <div class="legend" style="margin-top:10px">
+        <span class="item"><span class="sw" style="background:#60a5fa"></span>Alex ahead</span>
+        <span class="item"><span class="sw" style="background:#f472b6"></span>Stefan ahead</span>
+      </div>
+    </div>
+  `);
+})();
+
+// ── Podium + Key Facts (injected at TOP of #app) ────────────────────────────
+(function(){
+  const podiumHTML = `
+    <div class="card wide" style="margin-bottom:0">
+      <h2 style="margin-bottom:16px">🏆 Race Podium</h2>
+      <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;padding:0 40px 0">
+        <!-- P2 Alex -->
+        <div style="flex:1;max-width:200px;text-align:center">
+          <div style="font-size:28px;margin-bottom:4px">🥈</div>
+          <div style="font-weight:700;font-size:16px">Alex</div>
+          <div class="muted small">K08</div>
+          <div style="background:#94a3b8;border-radius:10px 10px 0 0;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:10px">
+            <div style="font-size:32px;font-weight:900;color:#0f172a">P2</div>
+            <div style="font-size:11px;color:#0f172a;opacity:0.8">+1.38 s</div>
+          </div>
+        </div>
+        <!-- P1 Stefan -->
+        <div style="flex:1;max-width:200px;text-align:center">
+          <div style="font-size:36px;margin-bottom:4px">🥇</div>
+          <div style="font-weight:700;font-size:18px">Stefan</div>
+          <div class="muted small">K07</div>
+          <div style="background:#f59e0b;border-radius:10px 10px 0 0;height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:10px">
+            <div style="font-size:38px;font-weight:900;color:#0f172a">P1</div>
+            <div style="font-size:11px;color:#0f172a;opacity:0.8">18:59.98 (1139.98 s)</div>
+          </div>
+        </div>
+        <!-- P3 Gerald -->
+        <div style="flex:1;max-width:200px;text-align:center">
+          <div style="font-size:24px;margin-bottom:4px">🥉</div>
+          <div style="font-weight:700;font-size:15px">Gerald</div>
+          <div class="muted small">K06</div>
+          <div style="background:#cd7f32;border-radius:10px 10px 0 0;height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:10px">
+            <div style="font-size:28px;font-weight:900;color:#0f172a">P3</div>
+            <div style="font-size:11px;color:#0f172a;opacity:0.8">+13.51 s</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card wide">
+      <h2>📊 Key Facts</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="muted small">Stefan's race-winning lap</div>
+          <div class="big">Lap 17</div>
+          <div>64.31 s — his personal best of the entire day, set on the very last lap to steal the win</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Alex in Training</div>
+          <div class="big">66.19 s</div>
+          <div>Fastest Training lap of anyone — already at race pace while others were still warming up</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Most improved</div>
+          <div class="big">Marcus</div>
+          <div>−4.61 s from Training to Race best (73.78 → 69.17 s)</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Closest non-podium battle</div>
+          <div class="big">0.13 s</div>
+          <div>Peter (1158.36 s) vs Nino (1158.49 s) — P5 vs P6 after 17 laps</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Mystery lap</div>
+          <div class="big">96.41 s</div>
+          <div>Nino, Qualifying lap 2 — +29 s over his normal pace. Spin, contact, or blocked.</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Track evolution</div>
+          <div class="big">−2.84 s</div>
+          <div>Average best lap improvement from Training (69.22 s) to Race (66.38 s) across the whole field</div>
+        </div>
+        <div class="stat">
+          <div class="muted small">Most consistent in race</div>
+          <div class="big">Gerald</div>
+          <div>±0.53 s std dev — robot-level consistency across 17 laps</div>
+        </div>
+      </div>
+    </div>
+  `;
+  app.insertAdjacentHTML('afterbegin', podiumHTML);
+})();
