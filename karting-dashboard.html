@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karting Dashboard</title>
+  <style>
+    body{font:14px/1.45 system-ui,sans-serif;background:#0f172a;color:#e5e7eb;margin:20px}
+    h1,h2,h3{margin:0 0 10px}.muted{color:#94a3b8}.small{font-size:12px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+    .card{background:#1e293b;border-radius:14px;padding:16px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+    .wide{grid-column:1/-1}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+    .stat{background:#111827;border-radius:10px;padding:10px 12px}.big{font-size:24px;font-weight:700}
+    .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.item{display:flex;align-items:center;gap:6px;font-size:12px;background:#111827;padding:4px 8px;border-radius:999px}
+    .sw{width:10px;height:10px;border-radius:999px;display:inline-block}svg{width:100%;height:auto;display:block;background:#0b1220;border-radius:10px}
+    table{width:100%;border-collapse:collapse}th,td{padding:7px 8px;border-bottom:1px solid #334155;text-align:left}th{color:#94a3b8}
+    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px}
+    .heat td{font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body>
+  <h1>Karting Session Dashboard</h1>
+  <p class="muted">Training, Qualifying and Race views from your karting session.</p>
+  <div id="app" class="grid"></div>
+  <script src="./karting-dashboard.js"></script>
+</body>
+</html>
